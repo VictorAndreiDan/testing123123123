@@ -1,6 +1,7 @@
 import requests
 import json
 import urllib3
+import os
 
 # Disable SSL warnings for internal domains
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -13,15 +14,9 @@ DT_API_KEY = "YOUR_API_KEY_HERE"
 CUSTOM_LOGIC_KEY = "collectionLogic" 
 CUSTOM_LOGIC_VALUE = "NONE"
 
-# File to save results
+# File names
+INPUT_FILENAME = "projects_to_create.txt"
 OUTPUT_FILENAME = "project_keys.txt"
-
-PROJECT_LIST = [
-    "Frontend-App",
-    "Backend-Service",
-    "Authentication-Module",
-    "Legacy-System"
-]
 
 def create_project(project_name):
     """
@@ -74,32 +69,46 @@ def get_existing_uuid(project_name):
     return "ALREADY EXISTS (UUID Lookup Failed)"
 
 def main():
-    # header string formatting
-    header = f"{'Project Name':<30} | {'Project Key (UUID)'}"
-    separator = "-" * 80
+    # 1. Read from Input File
+    if not os.path.exists(INPUT_FILENAME):
+        print(f"❌ ERROR: Could not find '{INPUT_FILENAME}'.")
+        print("   -> Please create this file and add one project name per line.")
+        return
 
-    # Open the file in write mode
-    with open(OUTPUT_FILENAME, "w") as f:
-        
-        # Print and write headers
+    print(f"Reading projects from '{INPUT_FILENAME}'...")
+    
+    with open(INPUT_FILENAME, "r") as f:
+        # Read lines, strip whitespace, and ignore empty lines
+        project_list = [line.strip() for line in f if line.strip()]
+
+    if not project_list:
+        print("❌ ERROR: The input file is empty.")
+        return
+
+    print(f"Found {len(project_list)} projects to process.\n")
+
+    # 2. Process and Write to Output File
+    header = f"{'Project Name':<40} | {'Project Key (UUID)'}"
+    separator = "-" * 90
+
+    with open(OUTPUT_FILENAME, "w") as f_out:
+        # Write headers
         print(header)
         print(separator)
-        f.write(header + "\n")
-        f.write(separator + "\n")
+        f_out.write(header + "\n")
+        f_out.write(separator + "\n")
 
-        for name in PROJECT_LIST:
+        for name in project_list:
             uuid = create_project(name)
             
-            # Format the output line
-            line = f"{name:<30} | {uuid}"
+            # Format output
+            line = f"{name:<40} | {uuid}"
             
-            # 1. Print to Console
+            # Print to console and file
             print(line)
+            f_out.write(line + "\n")
             
-            # 2. Write to File
-            f.write(line + "\n")
-            
-    print(f"\n[+] Processing complete. Results saved to '{OUTPUT_FILENAME}'")
+    print(f"\n[+] Done! Results saved to '{OUTPUT_FILENAME}'")
 
 if __name__ == "__main__":
     main()
