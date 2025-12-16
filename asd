@@ -1,46 +1,105 @@
 import requests
+import json
 import urllib3
 
+# Disable SSL warnings for internal domains
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- ADJUST THIS ---
-# Based on your openapi link: https://test/api/api/openapi.json
-# Try these variations if the first one fails:
-# 1. https://test/api
-# 2. https://test/api/api
-DT_BASE_URL = "https://test/api" 
+# --- CONFIGURATION ---
+DT_BASE_URL = "https://test/api/api" 
 DT_API_KEY = "YOUR_API_KEY_HERE"
 
-def debug_connection():
+# Custom Field Config (Update if you get Error 400)
+CUSTOM_LOGIC_KEY = "collectionLogic" 
+CUSTOM_LOGIC_VALUE = "NONE"
+
+# File to save results
+OUTPUT_FILENAME = "project_keys.txt"
+
+PROJECT_LIST = [
+    "Frontend-App",
+    "Backend-Service",
+    "Authentication-Module",
+    "Legacy-System"
+]
+
+def create_project(project_name):
+    """
+    Creates a project and returns the UUID.
+    """
     url = f"{DT_BASE_URL}/api/v1/project"
     
     headers = {
         "X-Api-Key": DT_API_KEY,
+        "Content-Type": "application/json",
         "Accept": "application/json"
     }
     
-    print(f"1. Target URL: {url}")
-    
-    try:
-        response = requests.get(url, headers=headers, params={"pageSize": 1}, verify=False)
-        
-        print(f"2. Status Code: {response.status_code}")
-        
-        # KEY FIX: Check content before converting to JSON
-        print("3. Response Content (First 500 chars):")
-        print("-" * 40)
-        print(response.text[:500]) # Print raw text
-        print("-" * 40)
+    payload = {
+        "name": project_name,
+        "classifier": "APPLICATION",
+        "active": True,
+        CUSTOM_LOGIC_KEY: CUSTOM_LOGIC_VALUE
+    }
 
-        # Only try to parse JSON if it looks like JSON
-        if response.text.strip().startswith("{") or response.text.strip().startswith("["):
-            print("4. JSON Parse Success:", response.json())
+    try:
+        response = requests.put(url, headers=headers, json=payload, verify=False)
+        
+        if response.status_code == 201:
+            return response.json().get('uuid')
+        elif response.status_code == 409:
+            return get_existing_uuid(project_name)
         else:
-            print("4. ERROR: Response is NOT JSON (likely HTML or plain text).")
-            print("   -> Check your URL path.")
+            return f"ERROR {response.status_code}: {response.text}"
 
     except Exception as e:
-        print(f"EXCEPTION: {e}")
+        return f"EXCEPTION: {str(e)}"
+
+def get_existing_uuid(project_name):
+    """
+    Helper: Fetch UUID if project already exists.
+    """
+    url = f"{DT_BASE_URL}/api/v1/project"
+    headers = {"X-Api-Key": DT_API_KEY}
+    params = {"searchText": project_name}
+    
+    try:
+        r = requests.get(url, headers=headers, params=params, verify=False)
+        if r.status_code == 200:
+            for p in r.json():
+                if p.get('name') == project_name:
+                    return f"{p.get('uuid')} (Existing)"
+    except:
+        pass
+    return "ALREADY EXISTS (UUID Lookup Failed)"
+
+def main():
+    # header string formatting
+    header = f"{'Project Name':<30} | {'Project Key (UUID)'}"
+    separator = "-" * 80
+
+    # Open the file in write mode
+    with open(OUTPUT_FILENAME, "w") as f:
+        
+        # Print and write headers
+        print(header)
+        print(separator)
+        f.write(header + "\n")
+        f.write(separator + "\n")
+
+        for name in PROJECT_LIST:
+            uuid = create_project(name)
+            
+            # Format the output line
+            line = f"{name:<30} | {uuid}"
+            
+            # 1. Print to Console
+            print(line)
+            
+            # 2. Write to File
+            f.write(line + "\n")
+            
+    print(f"\n[+] Processing complete. Results saved to '{OUTPUT_FILENAME}'")
 
 if __name__ == "__main__":
-    debug_connection()
+    main()
