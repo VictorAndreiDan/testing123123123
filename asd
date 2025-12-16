@@ -1,69 +1,48 @@
 import requests
-import json
+import urllib3
 
-# --- Configuration ---
-# specific the base URL of your Dependency-Track instance
-DT_API_URL = "http://localhost:8080" 
-# Replace with your actual API Key (Permissions required: PORTFOLIO_MANAGEMENT)
+# Disable SSL warnings for internal domains
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# --- CONFIGURATION ---
+# Based on your previous message, your base URL likely ends in /api
+# Try: "https://test/api" or just "https://test" depending on your proxy setup
+DT_BASE_URL = "https://test/api" 
 DT_API_KEY = "YOUR_API_KEY_HERE"
 
-# List of projects you want to create
-PROJECT_LIST = [
-    "Frontend-App",
-    "Backend-Service",
-    "Authentication-Module",
-    "Legacy-System"
-]
-
-def create_project(project_name):
-    """
-    Creates a project in Dependency-Track and returns the UUID.
-    """
-    url = f"{DT_API_URL}/api/v1/project"
+def test_connection():
+    # Endpoint to fetch first 10 projects
+    url = f"{DT_BASE_URL}/api/v1/project"
     
     headers = {
         "X-Api-Key": DT_API_KEY,
-        "Content-Type": "application/json",
         "Accept": "application/json"
     }
     
-    # Payload for project creation
-    # You can add "version": "1.0" or "classifier": "APPLICATION" if needed
-    payload = {
-        "name": project_name,
-        "classifier": "APPLICATION", 
-        "active": True
+    params = {
+        "pageSize": 1  # Just fetch 1 item to keep it light
     }
 
+    print(f"Testing connection to: {url} ...")
+
     try:
-        # Dependency-Track uses PUT to create a new project
-        response = requests.put(url, headers=headers, json=payload)
+        response = requests.get(url, headers=headers, params=params, verify=False)
         
-        # If successful (HTTP 201 Created)
-        if response.status_code == 201:
-            data = response.json()
-            return data.get('uuid')
+        print(f"Status Code: {response.status_code}")
         
-        # If project already exists (HTTP 409 Conflict)
-        elif response.status_code == 409:
-            return "ALREADY EXISTS"
-            
+        if response.status_code == 200:
+            print("✅ SUCCESS: Connection established and authenticated.")
+            print(f"Server returned: {len(response.json())} projects in this page.")
+        elif response.status_code == 401:
+            print("❌ ERROR: Unauthorized. Check your API KEY.")
+        elif response.status_code == 404:
+            print("❌ ERROR: Endpoint not found. Check your URL.")
         else:
-            return f"ERROR: {response.status_code} - {response.text}"
+            print(f"❌ ERROR: Server returned {response.status_code}")
+            print(f"Response: {response.text}")
 
     except Exception as e:
-        return f"EXCEPTION: {str(e)}"
-
-def main():
-    print(f"{'Project Name':<30} | {'Project Key (UUID)'}")
-    print("-" * 70)
-    
-    results = []
-
-    for name in PROJECT_LIST:
-        uuid = create_project(name)
-        results.append((name, uuid))
-        print(f"{name:<30} | {uuid}")
+        print(f"❌ EXCEPTION: {e}")
 
 if __name__ == "__main__":
-    main()
+    test_connection()
